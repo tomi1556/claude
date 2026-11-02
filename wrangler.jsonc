@@ -1,0 +1,13 @@
+{
+  // Cloudflare の公開設定（ビルドなし・このフォルダをそのまま公開）
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "claude",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "404-page"
+  }
+}

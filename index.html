@@ -1,1 +1,112 @@
-<h1>test</h1>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>作品置き場</title>
+<meta name="description" content="Claude と作ったページを並べておく場所。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2' width='12' height='12' rx='2' fill='%23c2622d'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f6f4ef;--card:#fffdf8;--ink:#1d1c1a;--mu:#6b675f;--line:#e2ddd2;--ac:#c2622d;--ac-soft:#f3e3d6;
+    --font:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){--bg:#141413;--card:#1c1b19;--ink:#ecebe6;--mu:#9c988f;--line:#2e2c28;--ac:#e08a55;--ac-soft:#3a2a1f}
+  }
+  :root[data-theme="dark"]{--bg:#141413;--card:#1c1b19;--ink:#ecebe6;--mu:#9c988f;--line:#2e2c28;--ac:#e08a55;--ac-soft:#3a2a1f}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  p,h1,h2{text-wrap:pretty;line-break:strict}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.8;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--ac-soft)}
+  :focus-visible{outline:2px solid var(--ac);outline-offset:3px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header{padding:72px 0 32px}
+  h1{font-size:clamp(32px,6vw,52px);line-height:1.2;margin:0 0 12px;letter-spacing:-.01em}
+  .lead{color:var(--mu);margin:0;max-width:34em}
+  .tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:28px}
+  .search{flex:1 1 240px;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--mu);font:inherit;font-size:14px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .tag:hover{color:var(--ink);border-color:var(--mu)}
+  .tag[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px}
+  .card{display:flex;flex-direction:column;gap:8px;height:100%;padding:22px;background:var(--card);border:1px solid var(--line);border-radius:14px;color:inherit;text-decoration:none;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,border-color .2s}
+  .card:hover{transform:translateY(-3px);border-color:var(--ac);box-shadow:0 12px 28px -12px rgba(0,0,0,.25)}
+  .meta{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mu)}
+  .pill{padding:2px 10px;border-radius:999px;background:var(--ac-soft);color:var(--ac);font-weight:700}
+  .card h2{font-size:20px;line-height:1.4;margin:4px 0 0}
+  .card p{margin:0;color:var(--mu);font-size:15px;flex:1}
+  .go{font-size:14px;font-weight:700;color:var(--ac)}
+  .go span{display:inline-block;transition:transform .2s}
+  .card:hover .go span{transform:translateX(3px)}
+  .empty{padding:48px 0;color:var(--mu);text-align:center}
+  footer{padding:56px 0 40px;color:var(--mu);font-size:13px}
+  @media (prefers-reduced-motion:no-preference){
+    .grid li{animation:in .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i) * 50ms)}
+    @keyframes in{from{opacity:0;transform:translateY(8px)}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>作品置き場</h1>
+    <p class="lead">Claude と作ったページを、ここに並べています。気になるものを開いてみてください。</p>
+  </header>
+
+  <div class="tools">
+    <input class="search" type="search" placeholder="名前や説明で探す" aria-label="作品を探す">
+    <div class="tags" role="group" aria-label="種類でしぼる"></div>
+  </div>
+
+  <ul class="grid" aria-live="polite"></ul>
+  <p class="empty" hidden></p>
+
+  <footer>作品は <code>works.json</code> に書き足すと、ここに並びます。</footer>
+</div>
+
+<script>
+(function () {
+  var grid = document.querySelector('.grid'), empty = document.querySelector('.empty');
+  var q = document.querySelector('.search'), tagBox = document.querySelector('.tags');
+  var works = [], cur = 'すべて';
+  var esc = function (s) { return String(s || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+
+  function render() {
+    var k = q.value.trim().toLowerCase();
+    var list = works.filter(function (w) {
+      return (cur === 'すべて' || w.tag === cur) && (!k || (w.title + ' ' + (w.desc || '')).toLowerCase().indexOf(k) > -1);
+    });
+    grid.innerHTML = list.map(function (w, i) {
+      return '<li style="--i:' + i + '"><a class="card" href="' + esc(w.path) + '">' +
+        '<span class="meta">' + (w.tag ? '<span class="pill">' + esc(w.tag) + '</span>' : '<span></span>') + '<time>' + esc(w.date) + '</time></span>' +
+        '<h2>' + esc(w.title) + '</h2><p>' + esc(w.desc) + '</p><span class="go">開く <span>→</span></span></a></li>';
+    }).join('');
+    empty.hidden = list.length > 0;
+    empty.textContent = works.length ? '条件に合う作品はありません。' : 'まだ作品はありません。';
+  }
+
+  function tags() {
+    var all = ['すべて'];
+    works.forEach(function (w) { if (w.tag && all.indexOf(w.tag) < 0) all.push(w.tag); });
+    if (all.length < 3) { tagBox.hidden = true; return; }
+    tagBox.hidden = false;
+    tagBox.innerHTML = all.map(function (t) { return '<button type="button" class="tag" aria-pressed="' + (t === cur) + '">' + esc(t) + '</button>'; }).join('');
+  }
+
+  tagBox.addEventListener('click', function (e) {
+    var b = e.target.closest('.tag'); if (!b) return;
+    cur = b.textContent; tags(); render();
+  });
+  q.addEventListener('input', render);
+
+  fetch('works.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (d) {
+    works = (d || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    tags(); render();
+  }).catch(function () { empty.hidden = false; empty.textContent = '一覧を読み込めませんでした。'; });
+})();
+</script>
+</body>
+</html>

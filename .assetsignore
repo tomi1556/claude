@@ -1,0 +1,8 @@
+# サイトに公開しないファイル
+.git
+.gitignore
+.assetsignore
+.wrangler
+node_modules
+wrangler.jsonc
+README.md
